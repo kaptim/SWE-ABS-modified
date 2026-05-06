@@ -333,9 +333,6 @@ def is_binary_diff_block(block: str) -> bool:
     if block.lstrip().startswith("Binary files"):
         return True
 
-    if "\n@@" not in block:
-        return True
-
     return False
 
 

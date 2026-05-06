@@ -475,15 +475,24 @@ def main(
         mutation_evaluation_info['eval_stage'] = aug_meta['stage']
         mutation_evaluation_info['iteration'] = aug_meta['iteration']
 
-        if 'error' in value['gold_state']:
+        gold_state = value.get('gold_state', {})
+        gold_failures = gold_state.get('fail')
+
+        if 'error' in gold_state:
             mutation_evaluation_info['status'] = "incompleted"
-            mutation_evaluation_info['error_info'] = value['gold_state']['error']
+            mutation_evaluation_info['error_info'] = gold_state['error']
+            all_predictions_test[key]['mutation_evaluation_info'] = mutation_evaluation_info
+            continue
+
+        if gold_failures is None:
+            mutation_evaluation_info['status'] = "incompleted"
+            mutation_evaluation_info['error_info'] = "gold_state.fail missing"
             all_predictions_test[key]['mutation_evaluation_info'] = mutation_evaluation_info
             continue
         
         mutation_evaluation_info['status'] = "completed"
 
-        if len(value['gold_state']['fail']) > 0:
+        if len(gold_failures) > 0:
             mutation_evaluation_info['pass_gold_patch_status'] = FAIL_STATUS
             continue
         else:

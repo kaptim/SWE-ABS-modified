@@ -434,8 +434,8 @@ def parse_trace_log(output_path: str):
             continue
     return coverage 
 
-
-def compute_coverage(output_path, modified_related_lines, use_key = "exe_slice_lines_scope"):
+#! for debug only, not used in the final evaluation
+def compute_coverage(output_path, modified_related_lines, use_key = "exe_modified_lines"):
     
     if len(modified_related_lines) == 0:
         return 1, {}

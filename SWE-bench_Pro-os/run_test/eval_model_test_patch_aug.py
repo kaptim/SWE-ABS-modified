@@ -549,8 +549,8 @@ def main(args):
     global_logger = setup_global_logger(paths["log_file"], add_stdout=True)
 
     # Load input data
-    with open(args.input_path, "r") as f:
-        predictions_test = json.load(f)
+    result_manager_input = ResultManager(args.input_path)
+    predictions_test = result_manager_input.load()
     global_logger.info(f"Loaded {len(predictions_test)} samples from {args.input_path}")
 
     # Setup output directory

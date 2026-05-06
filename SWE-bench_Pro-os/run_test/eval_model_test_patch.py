@@ -50,6 +50,14 @@ from utils.run_util import (
 
 global_logger = None
 
+def get_error_info(test_output_path: str) -> str:
+    try:
+        with open(test_output_path, "r") as f:
+            return f.read()
+    except Exception:
+        return "Parse Error"
+
+
 def get_coverage_instance(aug_test_instances):
     instances = {}
     for key in aug_test_instances:
@@ -865,6 +873,10 @@ def main(args):
                 if len(value['gold_state']['fail'])>0:
                     pass_gold_patch_status = FAIL_STATUS
                     gold_fail_list.append(instance_id)
+                    try:
+                        error_info = get_error_info(str(log_dir / instance_id / "gold_with_model_test" / "test_output.txt"))
+                    except Exception:
+                        error_info = "Parse Error"
                 else:
                     pass_gold_patch_status = SUCCESS_STATUS
 
@@ -877,13 +889,6 @@ def main(args):
                 else:
                     coverage_rate,uncovered_lines = 'unknow',{}
 
-                # Use ResultManager to update meta fields
-                result_manager.update_instance_nested(instance_id, {
-                    'meta.pass_gold_patch_status': pass_gold_patch_status,
-                    'meta.coverage_rate': coverage_rate,
-                    'meta.uncovered_lines': uncovered_lines,
-                })
-
                 evaluation_info = {
                     "status": "completed",
                     "pass_gold_patch_status": pass_gold_patch_status,
@@ -893,11 +898,13 @@ def main(args):
                     "uncovered_lines": uncovered_lines,
                 }
 
-                # Update the last stage's evaluation_info
-                instance_data = result_manager.get_instance(instance_id)
-                if instance_data and 'stage' in instance_data and instance_data['stage']:
-                    instance_data['stage'][-1]['evaluation_info'] = evaluation_info
-                    result_manager.update_instance(instance_id, instance_data, merge=False)
+                # Update meta fields and last stage's evaluation_info in one call
+                result_manager.update_instance_nested(instance_id, {
+                    'meta.pass_gold_patch_status': pass_gold_patch_status,
+                    'meta.coverage_rate': coverage_rate,
+                    'meta.uncovered_lines': uncovered_lines,
+                    'stage.-1.evaluation_info': evaluation_info,
+                })
 
             elif "gold_state" in value and "error" in value['gold_state']:
                 gold_error_list.append(instance_id)

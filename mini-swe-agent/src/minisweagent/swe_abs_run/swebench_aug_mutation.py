@@ -58,6 +58,9 @@ More information about the usage: [bold green]https://mini-swe-agent.com/latest/
 app = typer.Typer(rich_markup_mode="rich", add_completion=False)
 
 
+SUCCESS_STATUS = "success"
+
+
 class ProgressTrackingMutationAgent(MultiEnvAgent):
     """Simple wrapper around DefaultAgent that provides progress updates."""
 
@@ -116,6 +119,8 @@ def process_instance(
 
     agent = None
     extra_info = None
+    effective_model_test_patch = ""
+    apply_gold_file = []
 
     try:
         env_gold = get_sb_environment(config, instance, benchmark_type)
@@ -133,25 +138,81 @@ def process_instance(
             mutation_info = instance['mutation_info']
 
         need_aug_list = mutation_info[args.use_key]
+        current_model_test_patch = instance.get('model_test_patch', '')
+        last_old_model_test_patch = instance.get('last_old_model_test_patch', '')
 
-        mutation_key = need_aug_list[0]
+        # When iteration > 0, the input is the previous iteration's eval output.
+        # If the previous target produced an empty patch or only an incomplete eval
+        # record, do not immediately attack the same mutation key again when other
+        # pending keys still exist. This keeps target scheduling local to the aug
+        # worker instead of spreading per-key retry state into run_stage3_aug.py.
+        selected_need_aug_list = list(need_aug_list)
+        previous_aug_meta = (
+            instance.get('aug_meta') if isinstance(instance.get('aug_meta'), dict) else {}
+        )
+        previous_target_aug_key = previous_aug_meta.get('target_aug_key')
+        previous_eval_info = {}
+        if isinstance(instance.get('mutation_aug_evaluation_info'), dict):
+            previous_eval_info = instance['mutation_aug_evaluation_info']
+        elif isinstance(instance.get('mutation_evaluation_info'), dict):
+            previous_eval_info = instance['mutation_evaluation_info']
+
+        previous_eval_status = previous_eval_info.get('status')
+        previous_target_failed = (
+            iteration > 0
+            and bool(previous_target_aug_key)
+            and previous_target_aug_key in selected_need_aug_list
+            and (
+                not current_model_test_patch
+                or previous_eval_status != "completed"
+            )
+        )
+        if previous_target_failed and len(selected_need_aug_list) > 1:
+            selected_need_aug_list = [
+                key for key in selected_need_aug_list if key != previous_target_aug_key
+            ] + [previous_target_aug_key]
+
+        mutation_key = selected_need_aug_list[0]
         mutation_instance = instance['all_mutatation_patch'][mutation_key]
         mutation_patch,mutation_thinking = mutation_instance['model_patch'],mutation_instance['mutation_thinking']
 
         patch = filter_apply_diffs(instance['patch'], [])
 
-        patch = remove_conflicting_chunks(patch,instance['model_test_patch'])
-        mutation_patch = remove_conflicting_chunks(mutation_patch,instance['model_test_patch'])
+        # Base merged data uses meta.pass_gold_patch_status; later iter eval files use
+        # mutation_aug_evaluation_info.pass_gold_patch_status. Only keep building on
+        # the current patch if that version is known to pass the gold patch.
+        pass_gold_patch_status = None
+        has_eval_info = isinstance(instance.get('mutation_aug_evaluation_info'), dict)
+        if isinstance(instance.get('mutation_aug_evaluation_info'), dict):
+            pass_gold_patch_status = instance['mutation_aug_evaluation_info'].get('pass_gold_patch_status')
+        elif isinstance(instance.get('meta'), dict):
+            pass_gold_patch_status = instance['meta'].get('pass_gold_patch_status')
+
+        current_patch_is_trusted = (
+            pass_gold_patch_status == SUCCESS_STATUS
+            or (pass_gold_patch_status is None and not has_eval_info)
+        )
+        effective_model_test_patch = (
+            current_model_test_patch
+            if current_model_test_patch and current_patch_is_trusted
+            else last_old_model_test_patch
+        )
+
+        if not effective_model_test_patch:
+            raise RuntimeError("No usable model_test_patch found for augmentation")
+
+        patch = remove_conflicting_chunks(patch, effective_model_test_patch)
+        mutation_patch = remove_conflicting_chunks(mutation_patch, effective_model_test_patch)
 
         # Apply gold patch to the repo first to save context
-        apply_test_file = git_apply(env_gold, instance['model_test_patch'], workdir=workdir)
+        apply_gold_test_file = git_apply(env_gold, effective_model_test_patch, workdir=workdir)
         apply_gold_file = git_apply(env_gold, patch, workdir=workdir)
 
-        apply_test_file = git_apply(env_mutation, instance['model_test_patch'], workdir=workdir)
+        apply_mutation_test_file = git_apply(env_mutation, effective_model_test_patch, workdir=workdir)
         apply_mutation_file = git_apply(env_mutation, mutation_patch, workdir=workdir)
 
 
-        if not apply_test_file or not apply_gold_file or not apply_mutation_file:
+        if not apply_gold_test_file or not apply_gold_file or not apply_mutation_test_file or not apply_mutation_file:
             raise RuntimeError("Failed to apply patch to github repository")
 
         agent = ProgressTrackingMutationAgent(
@@ -165,7 +226,7 @@ def process_instance(
         test_command = build_test_command_with_directives(instance, benchmark_type)
 
         exit_status, result = agent.run(task,
-                                        test_patch=instance["model_test_patch"],
+                                        test_patch=effective_model_test_patch,
                                         gold_patch=patch,
                                         mutation_patch=mutation_patch,
                                         test_command=test_command,
@@ -197,7 +258,7 @@ def process_instance(
 
         # Save results using ResultManager
         # Save the old model_test_patch
-        instance['last_old_model_test_patch'] = instance['model_test_patch']
+        instance['last_old_model_test_patch'] = effective_model_test_patch
         instance['model_test_patch'] = result
 
         # Build aug_meta information

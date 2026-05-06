@@ -193,20 +193,37 @@ def run_instance(
         for path in tqdm(all_vaild_model_path, total=len(all_vaild_model_path), desc=instance_id):
 
             path:Path
-            use_path = path / "logs" / instance_id
-
+            # Historical downloaded trajectories use two layouts:
+            # 1. <run_dir>/logs/<instance_id>/{report.json,patch.diff}
+            # 2. <run_dir>/<instance_id>/{report.json,patch.diff}
+            # Prefer the newer logs/ layout, but fall back to the flat layout so
+            # old downloaded runs can be evaluated without manual reshaping.
+            candidate_paths = [
+                path / "logs" / instance_id,
+                path / instance_id,
+            ]
+            # use_path = candidate_paths[0]
+        
             each_log_dir = log_dir / path.name
 
-            report_file = use_path / 'report.json'
-            patch_file = use_path / 'patch.diff'
+            report_file = None
+            patch_file = None
+            for candidate_path in candidate_paths:
+                candidate_report = candidate_path / 'report.json'
+                candidate_patch = candidate_path / 'patch.diff'
+                if candidate_report.exists() and candidate_patch.exists():
+                    # use_path = candidate_path
+                    report_file = candidate_report
+                    patch_file = candidate_patch
+                    break
 
             # If report.json or patch.diff does not exist
-            if not report_file.exists() or not patch_file.exists():
+            if report_file is None or patch_file is None:
                 all_result['init_fail'].append(path.name)
                 # global_logger.error(f"{path}: report.json or patch.diff not exists")
                 continue
 
-            with open(use_path / 'report.json', "r") as f:
+            with open(report_file, "r") as f:
                 report = json.load(f)
 
             # If resolved is False in report.json
@@ -222,7 +239,7 @@ def run_instance(
                 # global_logger.error(f"{path}: resolved is False")
                 continue
 
-            with open(use_path / 'patch.diff', "r") as f:
+            with open(patch_file, "r") as f:
                 model_patch = f.read()
 
             # Remove conflicting parts between model_patch and model_test_patch
@@ -434,7 +451,15 @@ def get_vaild_mutation(mutation_paths):
                             continue
                     use_instance[key][mutation_key]=value
             else:
-                raise RuntimeError(f"mutation_path {mutation_path}, instance {key}, before judge mutation with aug test, please run the init test first.")
+                # Backward compatibility: some legacy mutation results were judged
+                # before init_test. If they were already judged as irrelevant, they
+                # should simply be skipped instead of crashing the whole merge.
+                if 'judge_info' in value and value['judge_info'].get('isrele') is False:
+                    continue
+                raise RuntimeError(
+                    f"mutation_path {mutation_path}, instance {key}, before judge mutation "
+                    f"with aug test, please run the init test first."
+                )
 
 
 
