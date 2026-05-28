@@ -26,18 +26,12 @@ agent:
 
     ## Overview
     You're a software engineer interacting continuously with a computer by submitting commands.
-    Your task is to reproduces the issue by writing independent test case and cover as many corner cases as possible.
+    Your task is to reproduce the issue by writing independent test cases and covering as many corner cases as possible.
     
     There is a gold patch that is used to fix the issue.
     --- Gold Patch ---
     ```
     {{gold_patch}}
-    ```
-
-    There is an original test patch that is used to verify the fix. You can learn from it to generate new test cases that thoroughly test the fix.
-    --- Original Test Patch ---
-    ```
-    {{test_patch}}
     ```
 
     IMPORTANT: 
@@ -54,15 +48,15 @@ agent:
       (2) Identify the core components and expected behavior. 
     2. Explore and Locate:  
       (1) Use the available tools to explore the repository structure and locate the source and test directories.
-      (2) Based on the gold patch and the original test patch, identify the most relevant source files and test files, and analyze how the original test verifies the fix.
-    3. Expand Test Coverage:  
-      (1) Extend the original test into a broader test suite, covering edge cases, corner cases, and stress conditions. 
+      (2) Based on the gold patch, identify the most relevant source files, and analyze how the fix works.
+    3. Set Up Test Suite:  
+      (1) Write a comprehensive test suite covering edge cases, corner cases, and stress conditions.
       (2) When writing tests, ensure generality and avoid overfitting assertions to the specific implementation of the gold patch.
           - Focus on verifying the correctness of behavior, not on matching the exact output form of the gold patch.
       (3) Run the tests to confirm that all pass with the gold patch applied.
       (4) If any tests fail, adjust the inputs or expected outputs until a stable and correct test suite is achieved.  
     4. Finalize Test Suite:
-      (1) Consolidate both the original and extended tests into a single new test file, rather than providing a git diff.
+      (1) Consolidate your tests into a single new test file, rather than providing a git diff.
       
     ## Command Execution Rules
     You are operating in an environment where
@@ -266,7 +260,7 @@ agent:
     ```
     But it fail:
     {{error_info}}
-  
+
   hard_code_fix_template: |
     Now you must review the tests you have written:
 
@@ -382,4 +376,3 @@ model:
   model_kwargs:
     drop_params: true
     temperature: 0.0
-
