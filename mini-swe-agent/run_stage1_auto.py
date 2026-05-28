@@ -24,14 +24,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from dotenv import load_dotenv
 
 # Pipeline phase definitions - order matters!
 PIPELINE_PHASES = [
-    "test_gen",        # Phase 1: Test generation
-    "hard_code_fix",   # Phase 2: Hard code fix
-    "gold_eval",       # Phase 3: Gold patch validation (without coverage)
-    "coverage_fix",    # Phase 4: Coverage fix (agent generates improved test patches)
-    "coverage_eval",   # Phase 5: Coverage evaluation (run tests + verify gold patch + get coverage data)
+    "test_gen",  # Phase 1: Test generation
+    "hard_code_fix",  # Phase 2: Hard code fix
+    "gold_eval",  # Phase 3: Gold patch validation (without coverage)
+    "coverage_fix",
+    # Phase 4: Coverage fix (agent generates improved test patches)
+    "coverage_eval",
+    # Phase 5: Coverage evaluation (run tests + verify gold patch + get coverage data)
 ]
 
 
@@ -109,7 +112,8 @@ class Stage1Config:
     # Behavior flags
     enable_coverage_fix: bool = True
     fail_fast: bool = False
-    start_from_phase: Optional[str] = None  # Options: test_gen, hard_code_fix, gold_eval, coverage_fix, coverage_eval
+    start_from_phase: Optional[
+        str] = None  # Options: test_gen, hard_code_fix, gold_eval, coverage_fix, coverage_eval
 
     # Timeouts
     script_timeout: int = 7200  # 2 hours
@@ -125,7 +129,8 @@ class InstanceTracker:
     def load_from_preds(self) -> Optional[Dict[str, Any]]:
         """Load and parse preds.json. Returns None if file doesn't exist or parsing fails."""
         if not self.preds_json_path.exists():
-            self.logger.warning(f"preds.json not found at {self.preds_json_path}")
+            self.logger.warning(
+                f"preds.json not found at {self.preds_json_path}")
             return None
 
         try:
@@ -135,7 +140,8 @@ class InstanceTracker:
             return data
         except json.JSONDecodeError as e:
             self.logger.error(f"Failed to parse preds.json: {e}")
-            self.logger.error("This usually means the JSON file is corrupted. Check the logs for the test generation phase.")
+            self.logger.error(
+                "This usually means the JSON file is corrupted. Check the logs for the test generation phase.")
             return None
         except Exception as e:
             self.logger.error(f"Error reading preds.json: {e}")
@@ -200,7 +206,8 @@ class InstanceTracker:
 
             # Check coverage rate
             coverage_rate = meta.get('coverage_rate', 'unknown')
-            if isinstance(coverage_rate, (int, float)) and 0 < coverage_rate < 1.0:
+            if isinstance(coverage_rate,
+                          (int, float)) and 0 < coverage_rate < 1.0:
                 low_coverage.append(instance_id)
 
         return low_coverage
@@ -236,7 +243,8 @@ class ScriptExecutor:
         self.config = config
         self.logger = logger
 
-    def run_test_generation(self, instance_ids: Optional[List[str]], redo_existing: bool = True) -> bool:
+    def run_test_generation(self, instance_ids: Optional[List[str]],
+                            redo_existing: bool = True) -> bool:
         """Execute run_agent.sh for specified instances (or all if instance_ids is None/empty)"""
         if instance_ids is not None and len(instance_ids) == 0:
             self.logger.info("No instances to generate tests for")
@@ -247,29 +255,34 @@ class ScriptExecutor:
         if instance_ids is None:
             self.logger.info(f"Running test generation for all instances")
         else:
-            self.logger.info(f"Running test generation for {len(instance_ids)} instances")
+            self.logger.info(
+                f"Running test generation for {len(instance_ids)} instances")
 
         result = self._execute_command(cmd, "test_generation")
         return result.returncode == 0
 
-    def run_hard_code_fix(self, instance_ids: Optional[List[str]] = None) -> bool:
+    def run_hard_code_fix(self,
+                          instance_ids: Optional[List[str]] = None) -> bool:
         """Execute run_agent_fix.sh with Hard_Code_Fix"""
         cmd = self._build_fix_command("Hard_Code_Fix", instance_ids)
 
         if instance_ids:
-            self.logger.info(f"Running Hard_Code_Fix for {len(instance_ids)} instances")
+            self.logger.info(
+                f"Running Hard_Code_Fix for {len(instance_ids)} instances")
         else:
             self.logger.info("Running Hard_Code_Fix for all eligible instances")
 
         result = self._execute_command(cmd, "hard_code_fix")
         return result.returncode == 0
 
-    def run_coverage_fix(self, instance_ids: Optional[List[str]] = None) -> bool:
+    def run_coverage_fix(self,
+                         instance_ids: Optional[List[str]] = None) -> bool:
         """Execute run_agent_fix.sh with Coverage_Fix"""
         cmd = self._build_fix_command("Coverage_Fix", instance_ids)
 
         if instance_ids:
-            self.logger.info(f"Running Coverage_Fix for {len(instance_ids)} instances")
+            self.logger.info(
+                f"Running Coverage_Fix for {len(instance_ids)} instances")
         else:
             self.logger.info("Running Coverage_Fix for all eligible instances")
 
@@ -277,7 +290,7 @@ class ScriptExecutor:
         return result.returncode == 0
 
     def run_gold_eval(self, instance_ids: Optional[List[str]] = None,
-                     coverage_eval: bool = False) -> Dict[str, Any]:
+                      coverage_eval: bool = False) -> Dict[str, Any]:
         """Execute eval_gold.sh and return results"""
         cmd = self._build_eval_command(instance_ids, coverage_eval)
 
@@ -289,7 +302,8 @@ class ScriptExecutor:
         result = self._execute_command(cmd, "gold_eval")
         return {"success": result.returncode == 0}
 
-    def _build_test_gen_command(self, instance_ids: Optional[List[str]], redo_existing: bool) -> List[str]:
+    def _build_test_gen_command(self, instance_ids: Optional[List[str]],
+                                redo_existing: bool) -> List[str]:
         """Build command for test generation - directly call Python script"""
         cmd = [
             "python",
@@ -310,7 +324,8 @@ class ScriptExecutor:
 
         return cmd
 
-    def _build_fix_command(self, fix_type: str, instance_ids: Optional[List[str]]) -> List[str]:
+    def _build_fix_command(self, fix_type: str,
+                           instance_ids: Optional[List[str]]) -> List[str]:
         """Build command for fix script - directly call Python script"""
         cmd = [
             "python",
@@ -328,7 +343,8 @@ class ScriptExecutor:
 
         return cmd
 
-    def _build_eval_command(self, instance_ids: Optional[List[str]], coverage_eval: bool) -> List[str]:
+    def _build_eval_command(self, instance_ids: Optional[List[str]],
+                            coverage_eval: bool) -> List[str]:
         """Build command for evaluation - different for swebench vs swebenchpro"""
 
         if self.config.benchmark == "swebenchpro":
@@ -359,7 +375,7 @@ class ScriptExecutor:
                 "--run_id", self.config.run_id,
                 "--eval_gold_patch", "True",
                 "--re_run_eval", "True",
-                "--use_coverage", "True",
+                "--use_coverage", "True" if coverage_eval else "False",
                 "--must_cover_line", str(self.config.must_cover_line_file),
                 "--coverage_eval", "True" if coverage_eval else "False",
             ]
@@ -369,7 +385,8 @@ class ScriptExecutor:
 
         return cmd
 
-    def _execute_command(self, cmd: List[str], phase: str) -> subprocess.CompletedProcess:
+    def _execute_command(self, cmd: List[str],
+                         phase: str) -> subprocess.CompletedProcess:
         """Execute command with real-time output and logging using PTY for progress bar support"""
         import pty
         import os
@@ -469,13 +486,15 @@ class ScriptExecutor:
                 stderr=None
             )
 
-            self.logger.info(f"{phase} completed with return code {result.returncode}")
+            self.logger.info(
+                f"{phase} completed with return code {result.returncode}")
             self.logger.info(f"Logs saved to {log_file}")
 
             return result
 
         except subprocess.TimeoutExpired:
-            self.logger.error(f"{phase} timed out after {self.config.script_timeout}s")
+            self.logger.error(
+                f"{phase} timed out after {self.config.script_timeout}s")
             if 'process' in locals():
                 process.kill()
             if 'master_fd' in locals():
@@ -519,26 +538,28 @@ class Stage1Orchestrator:
 
     def run(self) -> bool:
         """Execute full Stage 1 pipeline"""
-        self.logger.info("="*80)
+        self.logger.info("=" * 80)
         self.logger.info("Starting Stage 1 Automation")
-        self.logger.info("="*80)
+        self.logger.info("=" * 80)
         self.logger.info(f"Output directory: {self.config.output_dir}")
         self.logger.info(f"Model: {self.config.model}")
         self.logger.info(f"Workers: {self.config.workers}")
         self.logger.info(f"Benchmark: {self.config.benchmark}")
 
         if self.config.start_from_phase:
-            self.logger.info(f"⚡ Resuming from phase: {self.config.start_from_phase}")
+            self.logger.info(
+                f"⚡ Resuming from phase: {self.config.start_from_phase}")
 
         try:
             # Phase 1: Test Generation
             if should_run_phase("test_gen", self.config.start_from_phase):
-                self.logger.info("\n" + "="*80)
+                self.logger.info("\n" + "=" * 80)
                 self.logger.info("PHASE 1: TEST GENERATION")
-                self.logger.info("="*80)
+                self.logger.info("=" * 80)
 
                 if not self._phase_test_generation():
-                    self.logger.error("✗ Phase 1 (test_gen) failed. Stopping pipeline.")
+                    self.logger.error(
+                        "✗ Phase 1 (test_gen) failed. Stopping pipeline.")
                     self._generate_final_report()
                     return False
             else:
@@ -546,12 +567,13 @@ class Stage1Orchestrator:
 
             # Phase 2: Hard Code Fix
             if should_run_phase("hard_code_fix", self.config.start_from_phase):
-                self.logger.info("\n" + "="*80)
+                self.logger.info("\n" + "=" * 80)
                 self.logger.info("PHASE 2: HARD CODE FIX")
-                self.logger.info("="*80)
+                self.logger.info("=" * 80)
 
                 if not self._phase_hard_code_fix():
-                    self.logger.error("✗ Phase 2 (hard_code_fix) failed. Stopping pipeline.")
+                    self.logger.error(
+                        "✗ Phase 2 (hard_code_fix) failed. Stopping pipeline.")
                     self._generate_final_report()
                     return False
             else:
@@ -561,12 +583,13 @@ class Stage1Orchestrator:
 
             # Phase 3: Gold Patch Validation
             if should_run_phase("gold_eval", self.config.start_from_phase):
-                self.logger.info("\n" + "="*80)
+                self.logger.info("\n" + "=" * 80)
                 self.logger.info("PHASE 3: GOLD PATCH VALIDATION")
-                self.logger.info("="*80)
+                self.logger.info("=" * 80)
 
                 if not self._phase_gold_eval():
-                    self.logger.error("✗ Phase 3 (gold_eval) failed. Stopping pipeline.")
+                    self.logger.error(
+                        "✗ Phase 3 (gold_eval) failed. Stopping pipeline.")
                     self._generate_final_report()
                     return False
             else:
@@ -574,32 +597,39 @@ class Stage1Orchestrator:
 
             # Phase 4: Coverage Fix (optional)
             if self.config.enable_coverage_fix:
-                if should_run_phase("coverage_fix", self.config.start_from_phase):
-                    self.logger.info("\n" + "="*80)
+                if should_run_phase("coverage_fix",
+                                    self.config.start_from_phase):
+                    self.logger.info("\n" + "=" * 80)
                     self.logger.info("PHASE 4: COVERAGE FIX (Agent Work)")
-                    self.logger.info("="*80)
+                    self.logger.info("=" * 80)
 
                     if not self._phase_coverage_fix():
-                        self.logger.error("✗ Phase 4 (coverage_fix) failed. Stopping pipeline.")
+                        self.logger.error(
+                            "✗ Phase 4 (coverage_fix) failed. Stopping pipeline.")
                         self._generate_final_report()
                         return False
                 else:
                     self.logger.info("\n⏭ Skipping Phase 4: Coverage Fix")
 
                 # Phase 5: Coverage Evaluation (Test Execution)
-                if should_run_phase("coverage_eval", self.config.start_from_phase):
-                    self.logger.info("\n" + "="*80)
-                    self.logger.info("PHASE 5: COVERAGE EVALUATION (Test Execution)")
-                    self.logger.info("="*80)
+                if should_run_phase("coverage_eval",
+                                    self.config.start_from_phase):
+                    self.logger.info("\n" + "=" * 80)
+                    self.logger.info(
+                        "PHASE 5: COVERAGE EVALUATION (Test Execution)")
+                    self.logger.info("=" * 80)
 
                     if not self._phase_coverage_eval():
-                        self.logger.error("✗ Phase 5 (coverage_eval) failed. Stopping pipeline.")
+                        self.logger.error(
+                            "✗ Phase 5 (coverage_eval) failed. Stopping pipeline.")
                         self._generate_final_report()
                         return False
                 else:
-                    self.logger.info("\n⏭ Skipping Phase 5: Coverage Evaluation")
+                    self.logger.info(
+                        "\n⏭ Skipping Phase 5: Coverage Evaluation")
             else:
-                self.logger.info("\n⏭ Skipping Phase 4 & 5: Coverage Fix and Evaluation (disabled)")
+                self.logger.info(
+                    "\n⏭ Skipping Phase 4 & 5: Coverage Fix and Evaluation (disabled)")
 
             # Final report
             self._generate_final_report()
@@ -619,11 +649,13 @@ class Stage1Orchestrator:
 
         # Check if preds.json exists, if not, run initial test generation
         if not self.config.preds_json_path.exists():
-            self.logger.info("preds.json not found. Running initial test generation for all instances...")
+            self.logger.info(
+                "preds.json not found. Running initial test generation for all instances...")
             self.stats['test_gen_iterations'] = 1
 
             # Run test generation without specifying instance_ids (will process all)
-            success = self.executor.run_test_generation(None, redo_existing=True)
+            success = self.executor.run_test_generation(None,
+                                                        redo_existing=True)
             if not success:
                 self.logger.error("✗ Initial test generation failed")
                 return False
@@ -635,11 +667,13 @@ class Stage1Orchestrator:
             # Check if all instances succeeded after initial generation
             failed_ids = self.tracker.get_failed_test_gen()
             if failed_ids is None:
-                self.logger.error("✗ Cannot load or parse preds.json after initial generation")
+                self.logger.error(
+                    "✗ Cannot load or parse preds.json after initial generation")
                 return False
 
             if not failed_ids:
-                self.logger.info("✓ All instances have successful test generation!")
+                self.logger.info(
+                    "✓ All instances have successful test generation!")
                 return True
 
             # Some instances failed, continue with retry logic
@@ -648,34 +682,42 @@ class Stage1Orchestrator:
         else:
             iteration_start = 1
 
-        for iteration in range(iteration_start, self.config.max_test_gen_retries + 1):
+        for iteration in range(iteration_start,
+                               self.config.max_test_gen_retries + 1):
             self.stats['test_gen_iterations'] = iteration
-            self.logger.info(f"\n{'='*60}")
-            self.logger.info(f"Test Generation Iteration {iteration}/{self.config.max_test_gen_retries}")
-            self.logger.info('='*60)
+            self.logger.info(f"\n{'=' * 60}")
+            self.logger.info(
+                f"Test Generation Iteration {iteration}/{self.config.max_test_gen_retries}")
+            self.logger.info('=' * 60)
 
             failed_ids = self.tracker.get_failed_test_gen()
 
             if failed_ids is None:
-                self.logger.error("✗ Cannot load or parse preds.json - stopping test generation phase")
-                self.logger.error("The JSON file may be corrupted. Check test_generation logs for errors.")
+                self.logger.error(
+                    "✗ Cannot load or parse preds.json - stopping test generation phase")
+                self.logger.error(
+                    "The JSON file may be corrupted. Check test_generation logs for errors.")
                 return False
 
             if not failed_ids:
-                self.logger.info("✓ All instances have successful test generation!")
+                self.logger.info(
+                    "✓ All instances have successful test generation!")
                 return True
 
-            self.logger.info(f"Found {len(failed_ids)} instances needing test generation:")
+            self.logger.info(
+                f"Found {len(failed_ids)} instances needing test generation:")
             for i, instance_id in enumerate(failed_ids[:10], 1):
                 self.logger.info(f"  {i}. {instance_id}")
             if len(failed_ids) > 10:
                 self.logger.info(f"  ... and {len(failed_ids) - 10} more")
 
             # Run test generation for failed instances
-            success = self.executor.run_test_generation(failed_ids, redo_existing=True)
+            success = self.executor.run_test_generation(failed_ids,
+                                                        redo_existing=True)
 
             if not success:
-                self.logger.warning(f"⚠ Test generation script failed in iteration {iteration}")
+                self.logger.warning(
+                    f"⚠ Test generation script failed in iteration {iteration}")
 
             # Wait for file system sync
             self.logger.info("Waiting 2 seconds for file system sync...")
@@ -684,22 +726,27 @@ class Stage1Orchestrator:
         # Final check
         failed_ids = self.tracker.get_failed_test_gen()
         if failed_ids is None:
-            self.logger.error("✗ Cannot load or parse preds.json after all retries")
+            self.logger.error(
+                "✗ Cannot load or parse preds.json after all retries")
             return False
 
         # Check if ALL instances failed
         all_instances = self.tracker.get_all_instances()
         if failed_ids and len(failed_ids) == len(all_instances):
-            self.logger.error(f"✗ ALL {len(all_instances)} instances failed test generation")
-            self.logger.error("✗ Cannot proceed to next phase without any successful test generation")
+            self.logger.error(
+                f"✗ ALL {len(all_instances)} instances failed test generation")
+            self.logger.error(
+                "✗ Cannot proceed to next phase without any successful test generation")
             return False
 
         if failed_ids:
-            self.logger.warning(f"⚠ Test generation failed for {len(failed_ids)}/{len(all_instances)} instances")
+            self.logger.warning(
+                f"⚠ Test generation failed for {len(failed_ids)}/{len(all_instances)} instances")
             self.logger.warning("Continuing with successful instances...")
             self.stats['permanently_failed'].extend(failed_ids)
 
-        self.logger.info(f"✓ Test generation phase completed with {len(all_instances) - len(failed_ids)} successful instances")
+        self.logger.info(
+            f"✓ Test generation phase completed with {len(all_instances) - len(failed_ids)} successful instances")
         return True
 
     def _phase_hard_code_fix(self) -> bool:
@@ -707,8 +754,10 @@ class Stage1Orchestrator:
 
         self.logger.info("Running Hard_Code_Fix on all instances...")
         if not self.executor.run_hard_code_fix(instance_ids=None):
-            self.logger.error("✗ Hard_Code_Fix script failed (script-level error)")
-            self.logger.error("This indicates a serious problem (e.g., missing file, invalid arguments)")
+            self.logger.error(
+                "✗ Hard_Code_Fix script failed (script-level error)")
+            self.logger.error(
+                "This indicates a serious problem (e.g., missing file, invalid arguments)")
             return False
 
         time.sleep(2)
@@ -722,7 +771,8 @@ class Stage1Orchestrator:
         self.logger.info("Running initial gold patch validation...")
         eval_result = self.executor.run_gold_eval(coverage_eval=False)
         if not eval_result["success"]:
-            self.logger.error("✗ Gold patch evaluation script failed (script-level error)")
+            self.logger.error(
+                "✗ Gold patch evaluation script failed (script-level error)")
             return False
         time.sleep(2)
 
@@ -732,17 +782,20 @@ class Stage1Orchestrator:
 
             failed_ids = self.tracker.get_gold_patch_failures()
             if failed_ids is None:
-                self.logger.error("✗ Cannot load or parse preds.json - stopping gold eval phase")
+                self.logger.error(
+                    "✗ Cannot load or parse preds.json - stopping gold eval phase")
                 return False
 
             if not failed_ids:
                 self.logger.info("✓ All instances pass gold patch validation!")
                 return True
 
-            self.logger.info(f"\n{'='*60}")
-            self.logger.info(f"Gold Validation Retry {iteration}/{self.config.max_hard_code_fix_retries}")
-            self.logger.info('='*60)
-            self.logger.info(f"Found {len(failed_ids)} instances failing gold patch:")
+            self.logger.info(f"\n{'=' * 60}")
+            self.logger.info(
+                f"Gold Validation Retry {iteration}/{self.config.max_hard_code_fix_retries}")
+            self.logger.info('=' * 60)
+            self.logger.info(
+                f"Found {len(failed_ids)} instances failing gold patch:")
             for i, instance_id in enumerate(failed_ids[:10], 1):
                 self.logger.info(f"  {i}. {instance_id}")
             if len(failed_ids) > 10:
@@ -751,15 +804,18 @@ class Stage1Orchestrator:
             # Re-run hard code fix for failed instances
             self.logger.info("Re-running Hard_Code_Fix for failed instances...")
             if not self.executor.run_hard_code_fix(instance_ids=failed_ids):
-                self.logger.error("✗ Hard_Code_Fix script failed (script-level error)")
+                self.logger.error(
+                    "✗ Hard_Code_Fix script failed (script-level error)")
                 return False
             time.sleep(2)
 
             # Re-validate
             self.logger.info("Re-validating...")
-            eval_result = self.executor.run_gold_eval(instance_ids=failed_ids, coverage_eval=False)
+            eval_result = self.executor.run_gold_eval(instance_ids=failed_ids,
+                                                      coverage_eval=False)
             if not eval_result["success"]:
-                self.logger.error("✗ Gold patch evaluation script failed (script-level error)")
+                self.logger.error(
+                    "✗ Gold patch evaluation script failed (script-level error)")
                 return False
             time.sleep(2)
 
@@ -770,33 +826,39 @@ class Stage1Orchestrator:
             return False
 
         if failed_ids and self.config.max_combined_retries > 0:
-            self.logger.info(f"\n{'='*60}")
+            self.logger.info(f"\n{'=' * 60}")
             self.logger.info(f"Attempting combined re-generation + re-fix")
             self.logger.info(f"for {len(failed_ids)} persistent failures")
-            self.logger.info('='*60)
+            self.logger.info('=' * 60)
 
             for combined_iter in range(1, self.config.max_combined_retries + 1):
-                self.logger.info(f"\nCombined Re-gen+Fix Iteration {combined_iter}/{self.config.max_combined_retries}")
+                self.logger.info(
+                    f"\nCombined Re-gen+Fix Iteration {combined_iter}/{self.config.max_combined_retries}")
 
                 # Step 1: Re-generate tests
                 self.logger.info("Step 1: Re-generating tests...")
-                if not self.executor.run_test_generation(failed_ids, redo_existing=True):
-                    self.logger.error("✗ Test generation script failed (script-level error)")
+                if not self.executor.run_test_generation(failed_ids,
+                                                         redo_existing=True):
+                    self.logger.error(
+                        "✗ Test generation script failed (script-level error)")
                     return False
                 time.sleep(2)
 
                 # Step 2: Re-fix
                 self.logger.info("Step 2: Re-applying hard code fix...")
                 if not self.executor.run_hard_code_fix(instance_ids=failed_ids):
-                    self.logger.error("✗ Hard_Code_Fix script failed (script-level error)")
+                    self.logger.error(
+                        "✗ Hard_Code_Fix script failed (script-level error)")
                     return False
                 time.sleep(2)
 
                 # Step 3: Re-validate
                 self.logger.info("Step 3: Re-validating...")
-                eval_result = self.executor.run_gold_eval(instance_ids=failed_ids, coverage_eval=False)
+                eval_result = self.executor.run_gold_eval(
+                    instance_ids=failed_ids, coverage_eval=False)
                 if not eval_result["success"]:
-                    self.logger.error("✗ Gold patch evaluation script failed (script-level error)")
+                    self.logger.error(
+                        "✗ Gold patch evaluation script failed (script-level error)")
                     return False
                 time.sleep(2)
 
@@ -806,7 +868,8 @@ class Stage1Orchestrator:
                     self.logger.error("✗ Cannot load or parse preds.json")
                     return False
                 if not failed_ids:
-                    self.logger.info("✓ All instances now pass gold patch validation!")
+                    self.logger.info(
+                        "✓ All instances now pass gold patch validation!")
                     return True
 
         # Final check
@@ -818,16 +881,19 @@ class Stage1Orchestrator:
         # Check if ALL instances failed
         all_instances = self.tracker.get_all_instances()
         if failed_ids and len(failed_ids) == len(all_instances):
-            self.logger.error(f"✗ ALL {len(all_instances)} instances failed gold patch validation")
+            self.logger.error(
+                f"✗ ALL {len(all_instances)} instances failed gold patch validation")
             self.logger.error("✗ No instances passed - stopping pipeline")
             return False
 
         if failed_ids:
-            self.logger.warning(f"⚠ Gold patch validation failed for {len(failed_ids)}/{len(all_instances)} instances")
+            self.logger.warning(
+                f"⚠ Gold patch validation failed for {len(failed_ids)}/{len(all_instances)} instances")
             self.logger.warning("Continuing with successful instances...")
             self.stats['permanently_failed'].extend(failed_ids)
 
-        self.logger.info(f"✓ Gold validation phase completed with {len(all_instances) - len(failed_ids)} successful instances")
+        self.logger.info(
+            f"✓ Gold validation phase completed with {len(all_instances) - len(failed_ids)} successful instances")
         return True
 
     def _phase_coverage_fix(self) -> bool:
@@ -835,28 +901,35 @@ class Stage1Orchestrator:
 
         low_coverage_ids = self.tracker.get_low_coverage_instances()
         if low_coverage_ids is None:
-            self.logger.error("✗ Cannot load or parse preds.json - stopping coverage fix phase")
+            self.logger.error(
+                "✗ Cannot load or parse preds.json - stopping coverage fix phase")
             return False
 
         if not low_coverage_ids:
-            self.logger.info("✓ No instances need coverage fixing (all at 100% or unknown)")
+            self.logger.info(
+                "✓ No instances need coverage fixing (all at 100% or unknown)")
             return True
 
-        self.logger.info(f"Found {len(low_coverage_ids)} instances with coverage < 100%:")
+        self.logger.info(
+            f"Found {len(low_coverage_ids)} instances with coverage < 100%:")
         for i, instance_id in enumerate(low_coverage_ids[:10], 1):
             self.logger.info(f"  {i}. {instance_id}")
         if len(low_coverage_ids) > 10:
             self.logger.info(f"  ... and {len(low_coverage_ids) - 10} more")
 
         # Run coverage fix (agent work only - no test execution here)
-        self.logger.info("Running coverage fix (agent generating improved test patches)...")
+        self.logger.info(
+            "Running coverage fix (agent generating improved test patches)...")
         if not self.executor.run_coverage_fix(instance_ids=low_coverage_ids):
-            self.logger.error("✗ Coverage_Fix script failed (script-level error)")
+            self.logger.error(
+                "✗ Coverage_Fix script failed (script-level error)")
             return False
 
         time.sleep(2)
-        self.logger.info("✓ Coverage fix phase completed (test patches generated)")
-        self.logger.info("→ Next: Run Phase 5 (coverage_eval) to execute tests and verify coverage")
+        self.logger.info(
+            "✓ Coverage fix phase completed (test patches generated)")
+        self.logger.info(
+            "→ Next: Run Phase 5 (coverage_eval) to execute tests and verify coverage")
         return True
 
     def _phase_coverage_eval(self) -> bool:
@@ -871,7 +944,8 @@ class Stage1Orchestrator:
         # Run evaluation with coverage (this executes tests + verifies gold patch + gets coverage)
         eval_result = self.executor.run_gold_eval(coverage_eval=True)
         if not eval_result["success"]:
-            self.logger.error("✗ Coverage evaluation failed (script-level error)")
+            self.logger.error(
+                "✗ Coverage evaluation failed (script-level error)")
             return False
         time.sleep(2)
 
@@ -882,7 +956,8 @@ class Stage1Orchestrator:
             return False
 
         if failed_ids:
-            self.logger.warning(f"⚠ Warning: {len(failed_ids)} instances failed gold patch validation")
+            self.logger.warning(
+                f"⚠ Warning: {len(failed_ids)} instances failed gold patch validation")
             for i, instance_id in enumerate(failed_ids[:10], 1):
                 self.logger.warning(f"  {i}. {instance_id}")
             if len(failed_ids) > 10:
@@ -895,13 +970,16 @@ class Stage1Orchestrator:
             return False
 
         if low_coverage_ids:
-            self.logger.info(f"⚠ {len(low_coverage_ids)} instances still have incomplete coverage")
+            self.logger.info(
+                f"⚠ {len(low_coverage_ids)} instances still have incomplete coverage")
         else:
             self.logger.info("✓ All instances achieved full coverage!")
 
         all_instances = self.tracker.get_all_instances()
-        passed_count = len(all_instances) - len(failed_ids) if failed_ids else len(all_instances)
-        self.logger.info(f"✓ Coverage evaluation completed: {passed_count}/{len(all_instances)} instances passing")
+        passed_count = len(all_instances) - len(
+            failed_ids) if failed_ids else len(all_instances)
+        self.logger.info(
+            f"✓ Coverage evaluation completed: {passed_count}/{len(all_instances)} instances passing")
 
         return True
 
@@ -914,45 +992,52 @@ class Stage1Orchestrator:
         # Handle None cases (JSON parse errors) - use empty lists as fallback for reporting
         # Note: get_successful_instances() already returns [] on error, so only check failed and low_coverage
         if failed is None:
-            self.logger.warning("⚠ Cannot load preds.json for failed instances - using empty list")
+            self.logger.warning(
+                "⚠ Cannot load preds.json for failed instances - using empty list")
             failed = []
         if low_coverage is None:
-            self.logger.warning("⚠ Cannot load preds.json for low coverage instances - using empty list")
+            self.logger.warning(
+                "⚠ Cannot load preds.json for low coverage instances - using empty list")
             low_coverage = []
 
         self.stats['successful_instances'] = len(successful)
         self.stats['failed_instances'] = len(failed)
         self.stats['total_instances'] = len(self.tracker.get_all_instances())
 
-        self.logger.info("\n" + "="*80)
+        self.logger.info("\n" + "=" * 80)
         self.logger.info("STAGE 1 AUTOMATION FINAL REPORT")
-        self.logger.info("="*80)
+        self.logger.info("=" * 80)
         self.logger.info(f"Total Instances: {self.stats['total_instances']}")
-        self.logger.info(f"Test Generation Iterations: {self.stats['test_gen_iterations']}")
-        self.logger.info(f"Hard Code Fix Iterations: {self.stats['hard_code_fix_iterations']}")
-        self.logger.info(f"Coverage Fix Iterations: {self.stats['coverage_fix_iterations']}")
+        self.logger.info(
+            f"Test Generation Iterations: {self.stats['test_gen_iterations']}")
+        self.logger.info(
+            f"Hard Code Fix Iterations: {self.stats['hard_code_fix_iterations']}")
+        self.logger.info(
+            f"Coverage Fix Iterations: {self.stats['coverage_fix_iterations']}")
         self.logger.info("")
-        self.logger.info(f"✓ Successful Instances (Gold Patch Pass): {len(successful)}")
+        self.logger.info(
+            f"✓ Successful Instances (Gold Patch Pass): {len(successful)}")
         self.logger.info(f"✗ Failed Instances (Gold Patch Fail): {len(failed)}")
         self.logger.info(f"⚠ Low Coverage Instances: {len(low_coverage)}")
 
         if successful:
-            success_rate = (len(successful) / self.stats['total_instances']) * 100
+            success_rate = (len(successful) / self.stats[
+                'total_instances']) * 100
             self.logger.info(f"\nSuccess Rate: {success_rate:.1f}%")
 
         if failed:
-            self.logger.info("\n" + "-"*60)
+            self.logger.info("\n" + "-" * 60)
             self.logger.info("Failed Instance IDs:")
-            self.logger.info("-"*60)
+            self.logger.info("-" * 60)
             for i, instance_id in enumerate(failed[:20], 1):
                 self.logger.info(f"  {i}. {instance_id}")
             if len(failed) > 20:
                 self.logger.info(f"  ... and {len(failed) - 20} more")
 
         if low_coverage:
-            self.logger.info("\n" + "-"*60)
+            self.logger.info("\n" + "-" * 60)
             self.logger.info("Low Coverage Instance IDs:")
-            self.logger.info("-"*60)
+            self.logger.info("-" * 60)
             for i, instance_id in enumerate(low_coverage[:20], 1):
                 self.logger.info(f"  {i}. {instance_id}")
             if len(low_coverage) > 20:
@@ -973,7 +1058,7 @@ class Stage1Orchestrator:
         except Exception as e:
             self.logger.error(f"Failed to save report: {e}")
 
-        self.logger.info("="*80)
+        self.logger.info("=" * 80)
 
     def _setup_logger(self) -> logging.Logger:
         """Setup logger with file and console handlers"""
@@ -1020,68 +1105,71 @@ def main():
 
     # Required arguments
     parser.add_argument("--output", "-o", type=str, required=True,
-                       help="Output directory (contains preds.json)")
+                        help="Output directory (contains preds.json)")
     parser.add_argument("--model", "-m", type=str, required=True,
-                       help="Model to use (e.g., zai/glm-4.7)")
+                        help="Model to use (e.g., zai/glm-4.7)")
 
     # Optional arguments
     parser.add_argument("--benchmark", type=str, default="swebench",
-                       choices=["swebench", "swebenchpro"],
-                       help="Benchmark type: swebench or swebenchpro")
+                        choices=["swebench", "swebenchpro"],
+                        help="Benchmark type: swebench or swebenchpro")
     parser.add_argument("--temperature", type=float, default=1.0,
-                       help="Model temperature")
+                        help="Model temperature")
     parser.add_argument("--workers", type=int, default=2,
-                       help="Number of parallel workers for test generation and fixing")
+                        help="Number of parallel workers for test generation and fixing")
 
     # Test generation settings
     parser.add_argument("--subset", type=str, default="verified",
-                       help="Dataset subset to use")
+                        help="Dataset subset to use")
     parser.add_argument("--split", type=str, default="test",
-                       help="Dataset split to use")
+                        help="Dataset split to use")
     parser.add_argument("--repo-select-num", type=int, default=5,
-                       help="Number of instances to select per repo")
+                        help="Number of instances to select per repo")
 
     # Evaluation settings
     parser.add_argument("--run-id", type=str, default="stage1_auto",
-                       help="Run ID for evaluation results")
+                        help="Run ID for evaluation results")
     parser.add_argument("--eval-timeout", type=int, default=120,
-                       help="Timeout for each evaluation (swebench only)")
+                        help="Timeout for each evaluation (swebench only)")
     parser.add_argument("--max-eval-workers", type=int, default=12,
-                       help="Number of parallel workers for evaluation")
+                        help="Number of parallel workers for evaluation")
 
     # Retry limits
     parser.add_argument("--max-test-gen-retries", type=int, default=3,
-                       help="Max retries for test generation")
+                        help="Max retries for test generation")
     parser.add_argument("--max-hard-code-fix-retries", type=int, default=3,
-                       help="Max retries for hard code fix")
+                        help="Max retries for hard code fix")
     parser.add_argument("--max-combined-retries", type=int, default=2,
-                       help="Max combined re-gen + re-fix cycles")
+                        help="Max combined re-gen + re-fix cycles")
     parser.add_argument("--max-coverage-fix-attempts", type=int, default=2,
-                       help="Max attempts for coverage fixing")
+                        help="Max attempts for coverage fixing")
 
     # Behavior flags
     parser.add_argument("--skip-coverage-fix", action="store_true",
-                       help="Skip coverage fix phase")
+                        help="Skip coverage fix phase")
     parser.add_argument("--fail-fast", action="store_true",
-                       help="Stop on first unrecoverable failure")
+                        help="Stop on first unrecoverable failure")
     parser.add_argument("--start-from-phase", type=str,
-                       choices=["test_gen", "hard_code_fix", "gold_eval", "coverage_fix", "coverage_eval"],
-                       default=None,
-                       help="Resume from a specific phase (test_gen, hard_code_fix, gold_eval, coverage_fix, or coverage_eval)")
+                        choices=["test_gen", "hard_code_fix", "gold_eval",
+                                 "coverage_fix", "coverage_eval"],
+                        default=None,
+                        help="Resume from a specific phase (test_gen, hard_code_fix, gold_eval, coverage_fix, or coverage_eval)")
 
     # Paths (with defaults)
     parser.add_argument("--must-cover-line-file", type=str,
-                       default=None,
-                       help="Path to must cover line file (auto-detected based on benchmark if not specified)")
+                        default=None,
+                        help="Path to must cover line file (auto-detected based on benchmark if not specified)")
 
     args = parser.parse_args()
+    load_dotenv()
 
     # Build configuration
     base_output_dir = Path(args.output)
     # Use run_id as subdirectory for better organization
     output_dir = base_output_dir / args.run_id
-    
-    mini_swe_agent_dir = Path(__file__).parent  # Directory where this script is located
+
+    mini_swe_agent_dir = Path(
+        __file__).parent  # Directory where this script is located
     swe_bench_dir = mini_swe_agent_dir.parent / "swe-bench"
     swe_bench_pro_dir = mini_swe_agent_dir.parent / "SWE-bench_Pro-os"
 
@@ -1096,13 +1184,17 @@ def main():
 
     config = Stage1Config(
         output_dir=output_dir.resolve(),  # Convert to absolute path
-        preds_json_path=(output_dir / "preds.json").resolve(),  # Convert to absolute path
-        must_cover_line_file=must_cover_line_file.resolve(),  # Convert to absolute path
+        preds_json_path=(output_dir / "preds.json").resolve(),
+        # Convert to absolute path
+        must_cover_line_file=must_cover_line_file.resolve(),
+        # Convert to absolute path
 
         # Directory paths
-        mini_swe_agent_dir=mini_swe_agent_dir.resolve(),  # Convert to absolute path
+        mini_swe_agent_dir=mini_swe_agent_dir.resolve(),
+        # Convert to absolute path
         swe_bench_dir=swe_bench_dir.resolve(),  # Convert to absolute path
-        swe_bench_pro_dir=swe_bench_pro_dir.resolve(),  # Convert to absolute path
+        swe_bench_pro_dir=swe_bench_pro_dir.resolve(),
+        # Convert to absolute path
 
         # Model settings
         model=args.model,
@@ -1133,13 +1225,15 @@ def main():
 
     # Validate paths
     if not mini_swe_agent_dir.exists():
-        print(f"Error: mini-swe-agent directory not found at {mini_swe_agent_dir}")
+        print(
+            f"Error: mini-swe-agent directory not found at {mini_swe_agent_dir}")
         sys.exit(1)
     if not swe_bench_dir.exists() and args.benchmark == "swebench":
         print(f"Error: swe-bench directory not found at {swe_bench_dir}")
         sys.exit(1)
     if not swe_bench_pro_dir.exists() and args.benchmark == "swebenchpro":
-        print(f"Error: SWE-bench_Pro-os directory not found at {swe_bench_pro_dir}")
+        print(
+            f"Error: SWE-bench_Pro-os directory not found at {swe_bench_pro_dir}")
         sys.exit(1)
 
     # Run orchestrator
