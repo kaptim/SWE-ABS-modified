@@ -126,7 +126,6 @@ def process_instance(
 
 
         patch = filter_apply_diffs(instance['patch'], [])
-        test_patch = filter_apply_diffs(instance['test_patch'], [])
 
         apply_files = git_apply(env, patch, workdir=workdir)
 
@@ -144,7 +143,6 @@ def process_instance(
         test_command = get_test_command(instance, benchmark_type)
 
         exit_status, result = agent.run(task,
-                                        test_patch=test_patch,
                                         gold_patch=patch,
                                         test_command=test_command,
                                         workdir=workdir)
