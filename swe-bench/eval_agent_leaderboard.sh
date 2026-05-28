@@ -1,17 +1,17 @@
 #   bash-only   topk_swe_data
-vaild_model_path=$HOME/topk_swe_data
+vaild_model_path=evaluation/verified
 
-# vaild_model_name=20250522_tools_claude-4-sonnet,20250522_tools_claude-4-opus
+# vaild_model_name=20250519_trae
 # Get all filenames in the directory (non-hidden, non-directory), join as a comma-separated string
 vaild_model_name=$(ls "$vaild_model_path" | tr '\n' ',' | sed 's/,$//')
 
 # Option A: load test patches from a local preds.json produced by the SWE-ABS pipeline
-predictions_test_path=/path/to/preds.json
+predictions_test_path=mini-swe-agent/result/model_gen_test/full_run/preds.json
 
 # Option B: load test patches directly from HuggingFace (no local preds.json needed)
 # predictions_test_path=OpenAgentLab/SWE-Bench_Verified_ABS
 
-run_id=top30_pipline
+run_id=final_pro
 instance_ids=django__django-11206
 re_run_eval=True
 
@@ -20,8 +20,7 @@ python -m swebench.runtest.run_evaluation_test \
     --vaild_model_name $vaild_model_name \
     --vaild_model_path $vaild_model_path \
     --max_workers 12 \
-    --timeout 120 \
+    --timeout 180 \
     --run_id  $run_id \
-    --re_run_eval $re_run_eval \
+    --re_run_eval $re_run_eval
     # --instance_ids $instance_ids \
-
