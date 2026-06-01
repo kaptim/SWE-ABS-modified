@@ -182,6 +182,8 @@ python run_stage1_auto.py \
 
 **Output**: `result/model_gen_test/{run-id}/preds.json`
 
+**IMPORTANT**: By default, this only generates code for 10 instances (line 240 in swebench_test.py) which is helpful for testing.
+
 See [Stage 1 Guide (EN)](docs/stage1_guide_en.md) · [中文](docs/stage1_guide_zh.md)
 
 ---
@@ -248,6 +250,7 @@ See [Mutation Augmentation Guide (EN)](docs/mutation_aug_guide_en.md) · [中文
 Once you have a benchmark (augmented test patches), evaluate existing agent patches from the SWE-bench leaderboard to measure ranking changes.
 
 **Setup**: Download agent patches into a local directory (one folder per model, named by model key):
+You need to download the official data from the [SWE-bench repository](https://github.com/SWE-bench/experiments/tree/main). You can use `download_logs.py` for this, it is a modified version of what they put into their repository.
 
 ```
 topk_swe_data/
@@ -257,6 +260,7 @@ topk_swe_data/
 ```
 
 **Run evaluation**:
+IMPORTANT: for me, this required a Docker pro subscription (no pull limits).
 
 ```bash
 cd swe-bench
