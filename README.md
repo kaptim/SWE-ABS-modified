@@ -260,7 +260,8 @@ topk_swe_data/
 ```
 
 **Run evaluation**:
-IMPORTANT: for me, this required a Docker pro subscription (no pull limits).
+
+**IMPORTANT**: for me, this required a Docker pro subscription (no pull limits).
 
 ```bash
 cd swe-bench
